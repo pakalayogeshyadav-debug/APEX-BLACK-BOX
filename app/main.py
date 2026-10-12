@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.endpoints import router as api_router
+from app.core.config import settings
 from app.services.ingestion import ingestion_service
 from app.services.serial_manager import serial_manager
 
@@ -10,18 +11,20 @@ from app.services.serial_manager import serial_manager
 async def lifespan(app: FastAPI):
     # Startup
     loop = asyncio.get_running_loop()
-    serial_manager.set_loop(loop)
+    if settings.enable_serial_ingestion:
+        serial_manager.set_loop(loop)
     ingestion_service.start()
     yield
     # Shutdown
     await ingestion_service.stop()
-    serial_manager.shutdown()
+    if settings.enable_serial_ingestion:
+        serial_manager.shutdown()
 
 app = FastAPI(title="APEX BLACKBOX", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, replace with frontend origin
+    allow_origins=settings.allowed_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,6 +34,16 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from app.core.database import AsyncSessionLocal
 import asyncio
+
+@app.get("/")
+@app.get("/healthz")
+async def root_health_check():
+    """Lightweight root healthcheck endpoint for cloud platforms (Render, Railway, etc.)."""
+    return {
+        "status": "ok",
+        "service": "APEX_BLACKBOX_BACKEND",
+        "version": "1.0.0"
+    }
 
 @app.get("/api/v1/health")
 async def health_check():

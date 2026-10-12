@@ -35,8 +35,9 @@ import type {
   DecodedTelemetrySignal,
   ESP32DeviceDiagnostic
 } from '../types';
+import { API_V1_URL, getWsUrl } from '../config/api';
 
-const API_BASE = 'http://localhost:8000/api/v1';
+const API_BASE = API_V1_URL;
 
 // Format status badge styling
 const getStatusBadge = (status: DiagnosticStatusType) => {
@@ -723,7 +724,7 @@ export const DeviceHealth: React.FC = () => {
             <div className="font-semibold text-sm">Diagnostics Service Unreachable</div>
             <div className="font-mono mt-1">{fetchError}</div>
             <div className="mt-1 text-secondary">
-              Verify that the FastAPI backend is running on <code className="font-mono text-primary">localhost:8000</code>.
+              Verify that the FastAPI backend is running and reachable at <code className="font-mono text-primary">{API_V1_URL}</code>.
             </div>
           </div>
         </div>
@@ -1011,12 +1012,12 @@ export const DeviceHealth: React.FC = () => {
               />
               <DiagnosticRow
                 label="HTTP REST"
-                value="http://localhost:8000/api/v1"
+                value={API_V1_URL}
                 highlight="healthy"
               />
               <DiagnosticRow
                 label="WebSocket stream"
-                value="ws://localhost:8000/api/v1/ws/telemetry"
+                value={getWsUrl('/api/v1/ws/telemetry')}
                 highlight="healthy"
               />
               <DiagnosticRow

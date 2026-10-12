@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getWsUrl } from '../config/api';
 
 export const Settings: React.FC = () => {
   const [saved, setSaved] = useState(false);
@@ -93,7 +94,7 @@ export const Settings: React.FC = () => {
             </div>
             <div className="flex justify-between items-center py-2 border-b border-border">
               <span className="text-secondary font-sans">WebSocket telemetry URL</span>
-              <span className="text-primary font-medium">ws://localhost:8000/api/v1/ws/telemetry</span>
+              <span className="text-primary font-medium">{getWsUrl('/api/v1/ws/telemetry')}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-border">
               <span className="text-secondary font-sans">Inter-device channel</span>

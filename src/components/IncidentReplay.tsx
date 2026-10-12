@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { Play, Pause, X } from 'lucide-react';
+import { API_V1_URL } from '../config/api';
 
 interface IncidentReplayProps {
   eventId: string;
@@ -19,7 +20,7 @@ export const IncidentReplay: React.FC<IncidentReplayProps> = ({ eventId, onClose
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    fetch(`http://localhost:8000/api/v1/events/${eventId}/replay`)
+    fetch(`${API_V1_URL}/events/${eventId}/replay`)
       .then(res => {
         if (!res.ok) throw new Error("Replay telemetry unavailable for this incident");
         return res.json();

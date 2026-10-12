@@ -4,6 +4,7 @@ import { FileSpreadsheet, FileText, CheckCircle2, AlertCircle, Loader2 } from 'l
 import { useTelemetry } from '../providers/TelemetryProvider';
 import type { Recording } from '../types';
 import { downloadRecordingCSV, downloadRecordingPDF } from '../services/exportService';
+import { API_V1_URL } from '../config/api';
 
 export const BlackBox: React.FC = () => {
   const { recordingStatus, loggerDevice, history } = useTelemetry();
@@ -19,7 +20,7 @@ export const BlackBox: React.FC = () => {
 
   const fetchRecordings = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/recordings');
+      const res = await fetch(`${API_V1_URL}/recordings`);
       if (res.ok) {
         const data: Recording[] = await res.json();
         setRecordings(data);
@@ -39,7 +40,7 @@ export const BlackBox: React.FC = () => {
   useEffect(() => {
     if (!activeRecording?.id) return;
     setLoadingSamples(true);
-    fetch(`http://localhost:8000/api/v1/recordings/${activeRecording.id}/samples`)
+    fetch(`${API_V1_URL}/recordings/${activeRecording.id}/samples`)
       .then(res => res.json())
       .then(data => {
         setSamples(data || []);
@@ -58,7 +59,7 @@ export const BlackBox: React.FC = () => {
     setError(null);
 
     try {
-      const res = await fetch('http://localhost:8000/api/v1/blackbox/retrieve', {
+      const res = await fetch(`${API_V1_URL}/blackbox/retrieve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -77,7 +78,7 @@ export const BlackBox: React.FC = () => {
 
       const resJson = await res.json();
       const checkInterval = setInterval(async () => {
-        const checkRes = await fetch('http://localhost:8000/api/v1/recordings');
+        const checkRes = await fetch(`${API_V1_URL}/recordings`);
         if (checkRes.ok) {
           const recs: Recording[] = await checkRes.json();
           setRecordings(recs);
@@ -117,7 +118,7 @@ export const BlackBox: React.FC = () => {
     try {
       let dataSamples = samples;
       if (!dataSamples || dataSamples.length === 0) {
-        const res = await fetch(`http://localhost:8000/api/v1/recordings/${activeRecording.id}/samples`);
+        const res = await fetch(`${API_V1_URL}/recordings/${activeRecording.id}/samples`);
         if (!res.ok) throw new Error('Failed to retrieve recording samples from server.');
         dataSamples = await res.json();
         setSamples(dataSamples);
@@ -156,7 +157,7 @@ export const BlackBox: React.FC = () => {
     try {
       let dataSamples = samples;
       if (!dataSamples || dataSamples.length === 0) {
-        const res = await fetch(`http://localhost:8000/api/v1/recordings/${activeRecording.id}/samples`);
+        const res = await fetch(`${API_V1_URL}/recordings/${activeRecording.id}/samples`);
         if (!res.ok) throw new Error('Failed to retrieve recording samples from server.');
         dataSamples = await res.json();
         setSamples(dataSamples);

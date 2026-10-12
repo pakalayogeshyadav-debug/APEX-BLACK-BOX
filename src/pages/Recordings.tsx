@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FileSpreadsheet, FileText, Loader2, CheckCircle2, AlertCircle, Eye, X } from 'lucide-react';
 import type { Recording } from '../types';
 import { downloadRecordingCSV, downloadRecordingPDF } from '../services/exportService';
+import { API_V1_URL } from '../config/api';
 
 export const Recordings: React.FC = () => {
   const [recordings, setRecordings] = useState<Recording[]>([]);
@@ -16,7 +17,7 @@ export const Recordings: React.FC = () => {
   const fetchRecordings = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/v1/recordings');
+      const res = await fetch(`${API_V1_URL}/recordings`);
       if (!res.ok) throw new Error('Failed to load recordings');
       const data: Recording[] = await res.json();
       setRecordings(data);
@@ -35,7 +36,7 @@ export const Recordings: React.FC = () => {
     setSelectedRecording(rec);
     setLoadingSamples(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/recordings/${rec.id}/samples`);
+      const res = await fetch(`${API_V1_URL}/recordings/${rec.id}/samples`);
       if (res.ok) {
         const s = await res.json();
         setSamples(s || []);
@@ -52,7 +53,7 @@ export const Recordings: React.FC = () => {
     if (selectedRecording?.id === rec.id && samples.length > 0) {
       return samples;
     }
-    const res = await fetch(`http://localhost:8000/api/v1/recordings/${rec.id}/samples`);
+    const res = await fetch(`${API_V1_URL}/recordings/${rec.id}/samples`);
     if (!res.ok) throw new Error('Failed to fetch recording samples from server');
     const data = await res.json();
     return data || [];

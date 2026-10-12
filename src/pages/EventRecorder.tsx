@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { EventRecord } from '../types';
 import { IncidentReplay } from '../components/IncidentReplay';
+import { API_V1_URL } from '../config/api';
 
 export const EventRecorder: React.FC = () => {
   const [events, setEvents] = useState<EventRecord[]>([]);
@@ -13,7 +14,7 @@ export const EventRecorder: React.FC = () => {
     let isMounted = true;
     const fetchEvents = async () => {
       try {
-        const res = await fetch('http://localhost:8000/api/v1/events');
+        const res = await fetch(`${API_V1_URL}/events`);
         if (res.ok) {
           const data = await res.json();
           if (isMounted) {

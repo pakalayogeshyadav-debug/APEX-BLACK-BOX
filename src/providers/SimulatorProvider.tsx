@@ -10,6 +10,7 @@ import type {
   HardwareSimulatorState
 } from '../types/simulator';
 import { validateAndClampLayout, isTypingInInputElement } from '../utils/simulatorLayout';
+import { API_V1_URL, getWsUrl } from '../config/api';
 
 interface SimulatorContextType {
   simState: VehicleSimState;
@@ -181,7 +182,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Fetch initial simulator state
   const fetchState = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/simulator/state');
+      const res = await fetch(`${API_V1_URL}/simulator/state`);
       if (res.ok) {
         const data = await res.json();
         setSimState(data);
@@ -209,7 +210,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // WebSocket message listener for simulator.state
   useEffect(() => {
-    const wsUrl = `ws://${window.location.hostname || 'localhost'}:8000/api/v1/ws/telemetry`;
+    const wsUrl = getWsUrl('/api/v1/ws/telemetry');
     let ws: WebSocket | null = null;
     let reconnectTimer: any = null;
 
@@ -246,7 +247,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const checkHardwareSimulator = useCallback(async () => {
     try {
       setHardwareSimulatorInfo(prev => ({ ...prev, status: 'CONNECTING' }));
-      const res = await fetch('http://localhost:8000/api/v1/hardware-simulator/status');
+      const res = await fetch(`${API_V1_URL}/hardware-simulator/status`);
       if (res.ok) {
         const data = await res.json();
         setHardwareSimulatorInfo({
@@ -277,7 +278,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const configureHardwareSimulatorUrl = useCallback(async (newUrl: string): Promise<boolean> => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/hardware-simulator/config', {
+      const res = await fetch(`${API_V1_URL}/hardware-simulator/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ base_url: newUrl })
@@ -308,7 +309,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
       // If hardware simulator is targeted, forward over Wi-Fi bridge
       if (simulatorTarget === 'HARDWARE_WIFI') {
-        const hwRes = await fetch('http://localhost:8000/api/v1/hardware-simulator/controls', {
+        const hwRes = await fetch(`${API_V1_URL}/hardware-simulator/controls`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newControls)
@@ -334,7 +335,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       // Maintain local Python simulator state synchronization
-      const res = await fetch('http://localhost:8000/api/v1/simulator/controls', {
+      const res = await fetch(`${API_V1_URL}/simulator/controls`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newControls)
@@ -403,9 +404,9 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const startSimulation = async () => {
     try {
       if (simulatorTarget === 'HARDWARE_WIFI') {
-        await fetch('http://localhost:8000/api/v1/hardware-simulator/start', { method: 'POST' }).catch(() => {});
+        await fetch(`${API_V1_URL}/hardware-simulator/start`, { method: 'POST' }).catch(() => {});
       }
-      const res = await fetch('http://localhost:8000/api/v1/simulator/start', { method: 'POST' });
+      const res = await fetch(`${API_V1_URL}/simulator/start`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         if (data.state) setSimState(data.state);
@@ -419,9 +420,9 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     releaseAllKeys();
     try {
       if (simulatorTarget === 'HARDWARE_WIFI') {
-        await fetch('http://localhost:8000/api/v1/hardware-simulator/stop', { method: 'POST' }).catch(() => {});
+        await fetch(`${API_V1_URL}/hardware-simulator/stop`, { method: 'POST' }).catch(() => {});
       }
-      const res = await fetch('http://localhost:8000/api/v1/simulator/stop', { method: 'POST' });
+      const res = await fetch(`${API_V1_URL}/simulator/stop`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         if (data.state) setSimState(data.state);
@@ -433,7 +434,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const pauseSimulation = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/simulator/pause', { method: 'POST' });
+      const res = await fetch(`${API_V1_URL}/simulator/pause`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         if (data.state) setSimState(data.state);
@@ -445,7 +446,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const resumeSimulation = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/simulator/resume', { method: 'POST' });
+      const res = await fetch(`${API_V1_URL}/simulator/resume`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         if (data.state) setSimState(data.state);
@@ -458,7 +459,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const resetSimulation = async () => {
     releaseAllKeys();
     try {
-      const res = await fetch('http://localhost:8000/api/v1/simulator/reset', { method: 'POST' });
+      const res = await fetch(`${API_V1_URL}/simulator/reset`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         if (data.state) setSimState(data.state);
@@ -471,7 +472,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const startScenario = async (name: PresetScenarioName) => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/simulator/scenario/start', {
+      const res = await fetch(`${API_V1_URL}/simulator/scenario/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenario_name: name })
@@ -487,7 +488,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const stopScenario = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/simulator/scenario/stop', { method: 'POST' });
+      const res = await fetch(`${API_V1_URL}/simulator/scenario/stop`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         if (data.state) setSimState(data.state);
@@ -499,7 +500,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const triggerTestEvent = async (eventType: string, severity = 'medium', description?: string) => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/simulator/trigger-event', {
+      const res = await fetch(`${API_V1_URL}/simulator/trigger-event`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ event_type: eventType, severity, description })
@@ -515,7 +516,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const startSimRecording = async (durationSec = 300) => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/simulator/recording/start', {
+      const res = await fetch(`${API_V1_URL}/simulator/recording/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ duration_sec: durationSec })
@@ -533,7 +534,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const stopSimRecording = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/simulator/recording/stop', { method: 'POST' });
+      const res = await fetch(`${API_V1_URL}/simulator/recording/stop`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         setSimState(prev => ({ ...prev, is_recording: false, active_recording_id: null }));

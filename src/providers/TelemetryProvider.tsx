@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import type { TelemetryData, DeviceInfo } from '../types';
+import { API_V1_URL, getWsUrl } from '../config/api';
 
 interface RecordingStatus {
   recording_id: string;
@@ -41,7 +42,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const fetchDevices = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/v1/devices');
+      const res = await fetch(`${API_V1_URL}/devices`);
       if (res.ok) {
         const data: DeviceInfo[] = await res.json();
         if (isComponentMounted.current) {
@@ -57,7 +58,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!isComponentMounted.current) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const wsUrl = `ws://${window.location.hostname || 'localhost'}:8000/api/v1/ws/telemetry`;
+    const wsUrl = getWsUrl('/api/v1/ws/telemetry');
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {

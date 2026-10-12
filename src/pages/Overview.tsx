@@ -3,6 +3,7 @@ import ReactECharts from 'echarts-for-react';
 import { useTelemetry } from '../providers/TelemetryProvider';
 import type { EventRecord } from '../types';
 import { IncidentReplay } from '../components/IncidentReplay';
+import { API_V1_URL } from '../config/api';
 
 type TimeWindow = '10s' | '30s' | '1m' | '5m';
 
@@ -26,7 +27,7 @@ export const Overview: React.FC = () => {
     let isMounted = true;
     const fetchRecentEvents = async () => {
       try {
-        const res = await fetch('http://localhost:8000/api/v1/events');
+        const res = await fetch(`${API_V1_URL}/events`);
         if (res.ok) {
           const data = await res.json();
           if (isMounted) {
