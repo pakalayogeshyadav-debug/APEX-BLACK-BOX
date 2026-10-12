@@ -287,3 +287,56 @@ async def start_simulator_recording(payload: SimulatorRecordingStartRequest):
 async def stop_simulator_recording():
     res = await simulator_service.stop_recording()
     return res
+
+# ============================================================================
+# PHASE 2: HARDWARE ESP32 SIMULATOR WI-FI BRIDGE ENDPOINTS
+# ============================================================================
+
+from app.services.esp32_simulator_client import esp32_simulator_client
+from app.schemas.schemas import HardwareSimulatorConfigRequest
+
+@router.get("/hardware-simulator/status")
+async def get_hardware_simulator_status():
+    """Polls ESP32 #1 Wi-Fi connectivity and returns status, latency, and device payload."""
+    conn_info = await esp32_simulator_client.check_connectivity()
+    return conn_info
+
+@router.post("/hardware-simulator/controls")
+async def send_hardware_simulator_controls(payload: SimulatorControlsRequest):
+    """
+    Forwards validated vehicle controls to ESP32 #1 over Wi-Fi/HTTP.
+    Returns explicit hardware acknowledgement. Never fabricates success.
+    """
+    raw_dict = payload.model_dump(exclude_unset=True)
+    res = await esp32_simulator_client.send_controls(raw_dict)
+    if not res.get("acknowledged", False):
+        raise HTTPException(
+            status_code=503 if res.get("status") in ("TIMEOUT", "DISCONNECTED") else 400,
+            detail=res.get("error", "Failed to forward controls to ESP32 hardware simulator")
+        )
+    return res
+
+@router.post("/hardware-simulator/start")
+async def start_hardware_simulator():
+    """Commands ESP32 #1 to start transmitting simulated CAN frames."""
+    res = await esp32_simulator_client.start_simulation()
+    if not res.get("acknowledged", False):
+        raise HTTPException(status_code=503, detail=res.get("error", "ESP32 failed to start"))
+    return res
+
+@router.post("/hardware-simulator/stop")
+async def stop_hardware_simulator():
+    """Commands ESP32 #1 to stop transmitting simulated CAN frames."""
+    res = await esp32_simulator_client.stop_simulation()
+    if not res.get("acknowledged", False):
+        raise HTTPException(status_code=503, detail=res.get("error", "ESP32 failed to stop"))
+    return res
+
+@router.post("/hardware-simulator/config")
+async def configure_hardware_simulator(payload: HardwareSimulatorConfigRequest):
+    """Updates the target IP/URL for ESP32 #1."""
+    esp32_simulator_client.set_base_url(payload.base_url)
+    return {
+        "status": "Configured",
+        "base_url": esp32_simulator_client.base_url
+    }

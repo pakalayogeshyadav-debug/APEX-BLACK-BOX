@@ -1,14 +1,45 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSimulator } from '../../providers/SimulatorProvider';
 import type { GearType } from '../../types/simulator';
-import { Power, Disc, Gauge, TriangleAlert, ArrowLeft, ArrowRight, Lightbulb } from 'lucide-react';
+import {
+  Power,
+  Disc,
+  Gauge,
+  TriangleAlert,
+  ArrowLeft,
+  ArrowRight,
+  Lightbulb,
+  Cpu,
+  Wifi,
+  Globe,
+  RefreshCw
+} from 'lucide-react';
 
 interface Props {
   compact?: boolean;
 }
 
 export const DriverControlsPanel: React.FC<Props> = ({ compact = false }) => {
-  const { controls, updateControls, activeKeys } = useSimulator();
+  const {
+    controls,
+    updateControls,
+    activeKeys,
+    simulatorTarget,
+    setSimulatorTarget,
+    hardwareSimulatorInfo,
+    checkHardwareSimulator,
+    configureHardwareSimulatorUrl,
+    hardwareCommandError,
+    clearHardwareCommandError
+  } = useSimulator();
+
+  const [isEditingUrl, setIsEditingUrl] = useState(false);
+  const [tempUrl, setTempUrl] = useState(hardwareSimulatorInfo.base_url);
+
+  const handleSaveUrl = async () => {
+    await configureHardwareSimulatorUrl(tempUrl);
+    setIsEditingUrl(false);
+  };
 
   const handleAcceleratorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     updateControls({ accelerator: Number(e.target.value) });
@@ -35,6 +66,23 @@ export const DriverControlsPanel: React.FC<Props> = ({ compact = false }) => {
   if (compact) {
     return (
       <div className="flex flex-col gap-3 p-3 bg-surface rounded-[14px] border border-border">
+        {/* Compact Mode Target Status */}
+        <div className="flex items-center justify-between text-[11px] pb-1 border-b border-border/60">
+          <span className="font-semibold text-primary">Controls</span>
+          {simulatorTarget === 'HARDWARE_WIFI' ? (
+            <span className={`font-mono text-[10px] flex items-center gap-1 ${
+              hardwareSimulatorInfo.status === 'CONNECTED' ? 'text-success font-bold' : 'text-error font-bold'
+            }`}>
+              <Wifi size={11} />
+              ESP32: {hardwareSimulatorInfo.status}
+            </span>
+          ) : (
+            <span className="font-mono text-[10px] text-muted flex items-center gap-1">
+              <Cpu size={11} />
+              SW Engine
+            </span>
+          )}
+        </div>
         {/* Compact Accelerator & Brake Sliders */}
         <div className="grid grid-cols-2 gap-3">
           {/* Accelerator */}
@@ -124,6 +172,118 @@ export const DriverControlsPanel: React.FC<Props> = ({ compact = false }) => {
           <span className={`px-2 py-0.5 rounded border transition-colors ${isSpacePressed ? 'bg-error text-white border-error' : 'bg-surface-secondary text-muted border-border'}`}>SPACE</span>
         </div>
       </div>
+
+      {/* Target Simulator Mode (Software vs ESP32 Wi-Fi) */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 bg-surface-secondary/40 rounded-[14px] border border-border/80">
+        <div className="flex items-center gap-1.5 p-1 bg-surface rounded-[10px] border border-border text-xs font-medium">
+          <button
+            onClick={() => setSimulatorTarget('SOFTWARE')}
+            className={`px-3 py-1.5 rounded-[8px] transition-all flex items-center gap-1.5 cursor-pointer ${
+              simulatorTarget === 'SOFTWARE'
+                ? 'bg-primary text-white font-semibold shadow-xs'
+                : 'text-secondary hover:text-primary hover:bg-surface-secondary'
+            }`}
+          >
+            <Cpu size={14} />
+            <span>Software Model</span>
+          </button>
+          <button
+            onClick={() => setSimulatorTarget('HARDWARE_WIFI')}
+            className={`px-3 py-1.5 rounded-[8px] transition-all flex items-center gap-1.5 cursor-pointer ${
+              simulatorTarget === 'HARDWARE_WIFI'
+                ? 'bg-accent text-white font-semibold shadow-xs'
+                : 'text-secondary hover:text-primary hover:bg-surface-secondary'
+            }`}
+          >
+            <Wifi size={14} />
+            <span>ESP32 Wi-Fi CAN</span>
+          </button>
+        </div>
+
+        {/* ESP32 Wi-Fi Status & IP Configuration */}
+        {simulatorTarget === 'HARDWARE_WIFI' && (
+          <div className="flex items-center flex-wrap gap-2 text-xs">
+            {/* Status Badge */}
+            <div
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-mono font-semibold ${
+                hardwareSimulatorInfo.status === 'CONNECTED'
+                  ? 'bg-success/10 text-success border-success/30'
+                  : hardwareSimulatorInfo.status === 'CONNECTING'
+                  ? 'bg-[#B77916]/10 text-[#B77916] border-[#B77916]/30'
+                  : 'bg-error/10 text-error border-error/30'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                hardwareSimulatorInfo.status === 'CONNECTED' ? 'bg-success animate-pulse' :
+                hardwareSimulatorInfo.status === 'CONNECTING' ? 'bg-[#B77916] animate-ping' : 'bg-error'
+              }`} />
+              <span>{hardwareSimulatorInfo.status}</span>
+              {hardwareSimulatorInfo.latency_ms !== undefined && hardwareSimulatorInfo.status === 'CONNECTED' && (
+                <span className="text-secondary opacity-80">({hardwareSimulatorInfo.latency_ms}ms)</span>
+              )}
+            </div>
+
+            {/* IP Address Editor */}
+            {isEditingUrl ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={tempUrl}
+                  onChange={(e) => setTempUrl(e.target.value)}
+                  placeholder="http://192.168.1.100"
+                  className="px-2 py-1 text-xs font-mono bg-surface border border-accent rounded-[8px] w-44 text-primary"
+                />
+                <button
+                  onClick={handleSaveUrl}
+                  className="px-2.5 py-1 text-xs font-semibold bg-accent text-white rounded-[8px] hover:bg-accent/90 cursor-pointer"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setIsEditingUrl(false)}
+                  className="px-2 py-1 text-xs text-secondary hover:text-primary cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 font-mono text-[11px] text-secondary">
+                <Globe size={13} className="text-secondary" />
+                <span
+                  className="underline cursor-pointer hover:text-primary"
+                  title="Click to edit ESP32 LAN IP"
+                  onClick={() => { setTempUrl(hardwareSimulatorInfo.base_url); setIsEditingUrl(true); }}
+                >
+                  {hardwareSimulatorInfo.base_url}
+                </span>
+                <button
+                  onClick={checkHardwareSimulator}
+                  title="Test Connection"
+                  className="p-1 rounded hover:bg-surface-secondary text-secondary hover:text-primary ml-0.5 cursor-pointer"
+                >
+                  <RefreshCw size={12} className={hardwareSimulatorInfo.status === 'CONNECTING' ? 'animate-spin' : ''} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Hardware Error Toast Banner if command rejected or timed out */}
+      {simulatorTarget === 'HARDWARE_WIFI' && hardwareCommandError && (
+        <div className="flex items-center justify-between px-3.5 py-2 text-xs bg-error/10 border border-error/30 text-error rounded-[12px] animate-fade-in">
+          <div className="flex items-center gap-2">
+            <TriangleAlert size={14} className="shrink-0" />
+            <span><strong>ESP32 Wi-Fi Command Error:</strong> {hardwareCommandError}</span>
+          </div>
+          <button
+            onClick={clearHardwareCommandError}
+            className="text-xs font-bold underline hover:opacity-80 ml-2 cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Main Pedals & Steering Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

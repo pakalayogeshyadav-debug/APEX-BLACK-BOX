@@ -82,3 +82,15 @@ export interface ConsoleLayoutPreference {
   height: number;
   dockPosition?: 'right' | 'bottom';
 }
+
+export type SimulatorTargetType = 'SOFTWARE' | 'HARDWARE_WIFI';
+export type HardwareSimulatorStatusType = 'CONNECTED' | 'CONNECTING' | 'DISCONNECTED' | 'ERROR';
+
+export interface HardwareSimulatorState {
+  connected: boolean;
+  status: HardwareSimulatorStatusType;
+  base_url: string;
+  latency_ms?: number;
+  last_error?: string;
+  device?: Record<string, any>;
+}

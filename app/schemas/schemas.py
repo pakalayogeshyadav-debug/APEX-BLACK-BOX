@@ -310,4 +310,7 @@ class SimulatorEventTriggerRequest(BaseModel):
 class SimulatorRecordingStartRequest(BaseModel):
     duration_sec: int = 300
 
+class HardwareSimulatorConfigRequest(BaseModel):
+    base_url: str = Field(..., description="ESP32 Simulator LAN base URL, e.g. http://192.168.1.100")
+
 

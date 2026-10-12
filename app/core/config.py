@@ -8,8 +8,9 @@ class Settings(BaseSettings):
     db_host: str = "localhost"
     db_port: int = 3306
     api_key: str = "your_secure_api_key_here"
+    simulator_esp32_base_url: str = "http://192.168.1.100"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @property
     def database_url(self) -> str:

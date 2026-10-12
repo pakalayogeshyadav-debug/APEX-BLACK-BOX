@@ -29,6 +29,8 @@ __pycache__/
 .env.*
 !.env.example
 .streamlit/secrets.toml
+wifi_config.h
+firmware/**/wifi_config.h
 
 # Editor directories and files
 .vscode/*

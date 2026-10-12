@@ -294,7 +294,40 @@ class ManagedSerialConnection:
             elif msg_type in ["can_frame", "telemetry"] or "can_id" in data:
                 self.can_frames_received += 1
                 self.can_status = "OK"
-                self.details["last_can_id"] = data.get("can_id")
+                can_id_val = int(data.get("can_id", 0))
+                self.details["last_can_id"] = can_id_val
+
+                # Ingest raw hex payload if present (from esp32_can_receiver)
+                raw_hex = data.get("data")
+                if isinstance(raw_hex, str) and raw_hex:
+                    clean_hex = raw_hex.strip().replace(" ", "").upper()
+                    dlc_val = int(data.get("dlc", len(clean_hex) // 2))
+                    try:
+                        raw_frame = RawCANFrameSchema(
+                            timestamp_us=int(now.timestamp() * 1000000),
+                            sequence_number=self.can_frames_received,
+                            is_extended=can_id_val > 0x7FF,
+                            is_remote=False,
+                            can_id=can_id_val,
+                            dlc=dlc_val,
+                            payload_bytes=clean_hex,
+                            channel_id=0,
+                            status="VALID"
+                        )
+                        can_decoder_service.ingest_raw_frame(raw_frame)
+                        signals = can_decoder_service.latest_signals
+                        if signals["vehicle_speed"].is_valid and signals["vehicle_speed"].value is not None:
+                            self.current_telemetry_state["speed"] = signals["vehicle_speed"].value
+                        if signals["engine_rpm"].is_valid and signals["engine_rpm"].value is not None:
+                            self.current_telemetry_state["rpm"] = int(signals["engine_rpm"].value)
+                        if signals["throttle_position"].is_valid and signals["throttle_position"].value is not None:
+                            self.current_telemetry_state["throttle"] = signals["throttle_position"].value
+                        if signals["engine_coolant_temp"].is_valid and signals["engine_coolant_temp"].value is not None:
+                            self.current_telemetry_state["coolant"] = signals["engine_coolant_temp"].value
+                    except Exception as ex:
+                        logger.debug(f"Could not parse CAN frame payload: {ex}")
+
+                # Direct telemetry values if emitted as top-level fields
                 if "speed" in data or "vehicle_speed_kmh" in data:
                     self.current_telemetry_state["speed"] = float(data.get("speed") or data.get("vehicle_speed_kmh"))
                 if "rpm" in data or "engine_rpm" in data:

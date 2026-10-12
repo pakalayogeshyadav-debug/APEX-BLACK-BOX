@@ -5,7 +5,9 @@ import type {
   PresetScenarioName,
   ConsoleLayoutPreference,
   ConsoleViewMode,
-  ConsoleWindowMode
+  ConsoleWindowMode,
+  SimulatorTargetType,
+  HardwareSimulatorState
 } from '../types/simulator';
 import { validateAndClampLayout, isTypingInInputElement } from '../utils/simulatorLayout';
 
@@ -18,6 +20,15 @@ interface SimulatorContextType {
   cancelModeSwitch: () => void;
   confirmModeSwitch: () => void;
   pendingMode: 'HARDWARE' | 'SIMULATION' | null;
+
+  // Simulator Target (Local Software vs ESP32 Hardware Wi-Fi)
+  simulatorTarget: SimulatorTargetType;
+  setSimulatorTarget: (target: SimulatorTargetType) => void;
+  hardwareSimulatorInfo: HardwareSimulatorState;
+  checkHardwareSimulator: () => Promise<void>;
+  configureHardwareSimulatorUrl: (url: string) => Promise<boolean>;
+  hardwareCommandError: string | null;
+  clearHardwareCommandError: () => void;
 
   // Lifecycle
   startSimulation: () => Promise<void>;
@@ -124,6 +135,16 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [layout, setLayout] = useState<ConsoleLayoutPreference>(getInitialLayout);
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
 
+  // Hardware ESP32 Simulator (Wi-Fi) State
+  const [simulatorTarget, setSimulatorTarget] = useState<SimulatorTargetType>('SOFTWARE');
+  const [hardwareSimulatorInfo, setHardwareSimulatorInfo] = useState<HardwareSimulatorState>({
+    connected: false,
+    status: 'DISCONNECTED',
+    base_url: 'http://192.168.1.100'
+  });
+  const [hardwareCommandError, setHardwareCommandError] = useState<string | null>(null);
+  const clearHardwareCommandError = useCallback(() => setHardwareCommandError(null), []);
+
   const controlThrottleRef = useRef<number>(0);
   const pendingControlsRef = useRef<Partial<DriverControls> | null>(null);
   const keysDownRef = useRef<Set<string>>(new Set());
@@ -221,9 +242,98 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, []);
 
+  // Check ESP32 hardware simulator connectivity via LAN Wi-Fi
+  const checkHardwareSimulator = useCallback(async () => {
+    try {
+      setHardwareSimulatorInfo(prev => ({ ...prev, status: 'CONNECTING' }));
+      const res = await fetch('http://localhost:8000/api/v1/hardware-simulator/status');
+      if (res.ok) {
+        const data = await res.json();
+        setHardwareSimulatorInfo({
+          connected: Boolean(data.connected),
+          status: data.status || (data.connected ? 'CONNECTED' : 'DISCONNECTED'),
+          base_url: data.base_url || 'http://192.168.1.100',
+          latency_ms: data.latency_ms,
+          last_error: data.error,
+          device: data.device
+        });
+      } else {
+        setHardwareSimulatorInfo(prev => ({
+          ...prev,
+          connected: false,
+          status: 'ERROR',
+          last_error: `Server HTTP ${res.status}`
+        }));
+      }
+    } catch (e: any) {
+      setHardwareSimulatorInfo(prev => ({
+        ...prev,
+        connected: false,
+        status: 'DISCONNECTED',
+        last_error: e.message || 'Cannot reach bridge'
+      }));
+    }
+  }, []);
+
+  const configureHardwareSimulatorUrl = useCallback(async (newUrl: string): Promise<boolean> => {
+    try {
+      const res = await fetch('http://localhost:8000/api/v1/hardware-simulator/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base_url: newUrl })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHardwareSimulatorInfo(prev => ({ ...prev, base_url: data.base_url }));
+        await checkHardwareSimulator();
+        return true;
+      }
+    } catch (e) {
+      console.error('Failed to configure hardware simulator URL', e);
+    }
+    return false;
+  }, [checkHardwareSimulator]);
+
+  // Periodic polling for hardware simulator connectivity when selected
+  useEffect(() => {
+    if (simulatorTarget === 'HARDWARE_WIFI') {
+      checkHardwareSimulator();
+      const interval = setInterval(checkHardwareSimulator, 6000);
+      return () => clearInterval(interval);
+    }
+  }, [simulatorTarget, checkHardwareSimulator]);
+
   // Send controls to backend with throttling
   const sendControls = useCallback(async (newControls: Partial<DriverControls>) => {
     try {
+      // If hardware simulator is targeted, forward over Wi-Fi bridge
+      if (simulatorTarget === 'HARDWARE_WIFI') {
+        const hwRes = await fetch('http://localhost:8000/api/v1/hardware-simulator/controls', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newControls)
+        });
+        if (hwRes.ok) {
+          const hwData = await hwRes.json();
+          setHardwareCommandError(null);
+          setHardwareSimulatorInfo(prev => ({
+            ...prev,
+            connected: true,
+            status: 'CONNECTED',
+            latency_ms: hwData.latency_ms
+          }));
+        } else {
+          const errData = await hwRes.json().catch(() => ({}));
+          setHardwareCommandError(errData.detail || `ESP32 returned HTTP ${hwRes.status}`);
+          setHardwareSimulatorInfo(prev => ({
+            ...prev,
+            status: hwRes.status === 503 ? 'DISCONNECTED' : 'ERROR',
+            last_error: errData.detail
+          }));
+        }
+      }
+
+      // Maintain local Python simulator state synchronization
       const res = await fetch('http://localhost:8000/api/v1/simulator/controls', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -236,7 +346,7 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch (e) {
       console.error('Failed to send controls', e);
     }
-  }, []);
+  }, [simulatorTarget]);
 
   const updateControls = useCallback((newControls: Partial<DriverControls>) => {
     setControls(prev => {
@@ -292,6 +402,9 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Simulation lifecycle
   const startSimulation = async () => {
     try {
+      if (simulatorTarget === 'HARDWARE_WIFI') {
+        await fetch('http://localhost:8000/api/v1/hardware-simulator/start', { method: 'POST' }).catch(() => {});
+      }
       const res = await fetch('http://localhost:8000/api/v1/simulator/start', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
@@ -305,6 +418,9 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const stopSimulation = async () => {
     releaseAllKeys();
     try {
+      if (simulatorTarget === 'HARDWARE_WIFI') {
+        await fetch('http://localhost:8000/api/v1/hardware-simulator/stop', { method: 'POST' }).catch(() => {});
+      }
       const res = await fetch('http://localhost:8000/api/v1/simulator/stop', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
@@ -639,6 +755,13 @@ export const SimulatorProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         cancelModeSwitch,
         confirmModeSwitch,
         pendingMode,
+        simulatorTarget,
+        setSimulatorTarget,
+        hardwareSimulatorInfo,
+        checkHardwareSimulator,
+        configureHardwareSimulatorUrl,
+        hardwareCommandError,
+        clearHardwareCommandError,
         startSimulation,
         stopSimulation,
         pauseSimulation,
