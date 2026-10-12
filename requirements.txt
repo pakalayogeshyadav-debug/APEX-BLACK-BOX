@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+sqlalchemy[asyncio]
+aiomysql
+cryptography
+alembic
+pydantic
+pydantic-settings
+websockets
+pytest
+pytest-asyncio
+httpx
+pyserial
